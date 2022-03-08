@@ -27,8 +27,9 @@ public:
 private:
     Configs starts,goals;
     Grids *graph;
-    bool prepare_and_solve(int timestep,Path &);
-    void add_edge(int u,int v);
+    void prepare(int timestep,Path &);
+    bool solve_model();
+    void add_edge(flowNode & u,flowNode &v);
     void insert_node(int &id,flowNode &node);
     void find_arc_by_head();
 

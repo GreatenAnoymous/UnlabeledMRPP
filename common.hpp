@@ -90,4 +90,5 @@ void format_paths(Paths &paths);
 void evaluate_result(Paths &,int &makespan,int &makespanLB,int &soc,int &socLB);   
 void fill_paths(Paths &,int makespan=-1);
 void shrink_paths(Paths&paths);
+// void precompute_dist(Grids*graph,Configs&starts,Configs&goals,std::vector<std::tuple<int,int,double>>&costEdges);
 //////////////////////////////////////////////////////////////////////////////////
