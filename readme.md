@@ -8,6 +8,7 @@
 
 ## Run
 `cmake .`
+
 `make` 
 
 ## Visualization
