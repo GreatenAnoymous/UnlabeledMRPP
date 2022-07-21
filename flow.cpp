@@ -271,7 +271,7 @@ Paths FlowMAPF::solveWeighted(){
     auto getWeight=[&](int head,int tail){
         auto node1=id_node[head];
         auto node2=id_node[tail];
-        if(std::get<0>(node1)==std::get<1>(node2)) return 0;
+        if(std::get<0>(node1)==std::get<0>(node2)) return 0;
         return 1;
     };
     evaluateLB();
