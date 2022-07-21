@@ -126,6 +126,7 @@ Configs Grids::getNeighbors(Location *node){
         auto nc=getVertex(node->x+1,node->y);
         if(nc!=nullptr) neighbors.push_back(nc);
     }
+    return neighbors;
 }
 
 
@@ -152,11 +153,9 @@ void read_scen(std::string file_name,Configs&starts,Configs &goals,Grids *graph)
     // std::regex r_xmax=std::regex(R"(xmax=(\d+))");
     // std::regex r_ymax=std::regex(R"(ymax=(\d+))");
     // std::regex r_zmax=std::regex(R"(zmax=(\d+))");
-    std::regex r_sg=std::regex(R"((\d+),(\d+),(\d+),(\d+),(\d+),(\d+))");
-
-   
+    std::regex r_sg=std::regex(R"((\d+),(\d+),(\d+),(\d+))");
     if(!scen_file){
-        std::cout<<"File not found!"<<std::endl;
+        std::cout<<"File not found! file name="<<file_name<<std::endl;
         exit(0);
     }
     int id=0;
@@ -168,7 +167,6 @@ void read_scen(std::string file_name,Configs&starts,Configs &goals,Grids *graph)
             
             int x_s=std::stoi(results[1].str());
             int y_s=std::stoi(results[2].str());
-         
             int x_g=std::stoi(results[3].str());
             int y_g=std::stoi(results[4].str());
             starts.emplace_back(graph->getVertex(x_s,y_s));
@@ -204,9 +202,7 @@ void save_solutions(std::string file_name,Paths&paths,double runtime,bool save_p
     out<<"solutions="<<std::endl;
     for(int i=0;i<paths.size();i++){
         out<<i<<":";
-     
         for(const auto &v:paths[i]){
-           
             out<<'('<<v->x<<","<<v->y<<"),";
         }
         out<<std::endl;
@@ -232,7 +228,9 @@ void check_feasible_bruteForce(Paths & paths){
         for(int i=0;i<paths.size();i++){
             for(int j=i+1;j<paths.size();j++){
                 if(paths[i][t]==paths[j][t]) {
-                    printf("Vertex collision (%d,%d,%d,%d)\n",i,j,t,paths[i][j]->id);
+                    printf("Vertex collision (%d,%d,%d,%d)\n",i,j,t,paths[i][t]->id);
+                    std::cout<<paths[i][t]->print()<<std::endl;
+                    std::cout<<paths[j][t]->print()<<std::endl;
                     assert(false);
                 }
                 if(paths[i][t-1]==paths[j][t] and paths[i][t]==paths[j][t-1]){
@@ -246,15 +244,7 @@ void check_feasible_bruteForce(Paths & paths){
 }
 
 
-/**
- * @brief 
- * 
- * @param paths 
- * @param makespan 
- */
-void fill_paths(Paths &paths,int makespan){
-    if(makespan==-1){
-        for(auto &p:paths)makespan=std::max((int)p.size(),makespan);
+/**     espan=std::max((int)p.size(),makespan);
     }
     for(auto &p:paths){
         while(p.size()<makespan) p.emplace_back(p.back());
@@ -290,5 +280,60 @@ void shrink_paths(Paths&paths){
     for(auto &p:paths){
         if(p.size()<=1) continue;
         while(p.back()==p.end()[-2]) p.pop_back();
+    }
+}
+
+
+/**
+ * @brief 
+ * 
+ * @param paths 
+ * @param runtime 
+ * @param save_paths 
+ */
+void save_result_as_json(std::string file_name,Paths &paths,double runtime,bool save_paths){
+    nlohmann::json data_json;
+
+    int makespan,makespanLB,soc,socLB;
+    evaluate_result(paths,makespan,makespanLB,soc,socLB);
+    data_json["makespan"]=makespan;
+    data_json["makespanLB"]=makespanLB;
+    data_json["runtime"]=runtime;
+    data_json["soc"]=soc;
+    data_json["socLB"]=socLB;
+    if(save_paths){
+        std::vector<std::vector<std::vector<int>>> paths_data(paths.size(),std::vector<std::vector<int>>());
+        for(int i=0;i<paths.size();i++){
+            for (auto v:paths[i]){
+                paths_data[i].push_back({v->x,v->y});
+            }
+        }
+        nlohmann::json paths_json(paths_data);
+        data_json["paths"]=paths_json;
+        
+    }
+
+    std::ofstream file;
+    file.open(file_name);
+    // std::cout<<data_json["tasks"].size()<<std::endl;
+    std::cout<<"save as  "<<file_name<<std::endl;
+    file<< data_json<<std::endl; 
+}
+
+/**
+ * @brief 
+ * 
+ * @param makespan 
+ */
+void fill_paths(Paths &paths,int makespan){
+    if(makespan==-1){
+        for(auto &p:paths){
+            makespan=std::max((int)p.size(),makespan);
+        }
+    }
+    for(auto &p:paths){
+        while(p.size()<makespan){
+            p.push_back(p.back());
+        }
     }
 }

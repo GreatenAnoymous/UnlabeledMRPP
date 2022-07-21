@@ -48,7 +48,6 @@ public:
     using openList=std::priority_queue<AStarNode_p,AStarNodes,decltype(compareOpen)>;
 
     void standard_init();
-  
 private:
     Location* start,*goal;
 };
@@ -65,7 +64,6 @@ public:
     std::function<Configs(Location *)> getNeighbors;
     using openList=std::queue<Location*>;
     Path solve();
-   
 private:
     Location *start;
     int depth;

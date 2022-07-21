@@ -10,8 +10,9 @@
  */
 
 #include "flow.hpp"
-#include <ortools/graph/max_flow.h>
-
+// #define DEBUG true
+#define IN 0
+#define OUT 1
 
 using namespace operations_research;
 
@@ -26,31 +27,68 @@ FlowMAPF::FlowMAPF(Configs&starts,Configs &goals,Grids*graph):starts(starts),goa
 
 }
 
+
+
+
+FlowMAPF::~FlowMAPF(){
+    
+}
+
 /**
  * @brief 
  * 
- * @return Path 
+ * @return Paths 
  */
-Path FlowMAPF::solve(){
+Paths FlowMAPF::solve(){
     evaluateLB();
     int timeStep=makespanLB;
     bool solved=true;
-    Path result;
+    Paths result;
     while(true){
-        prepare(timeStep,result);
-        solved=solve_model();
-        if(solved) break;
+        // std::cout<<"preparing model for timestep="<<timeStep<<std::endl;
+        prepare(timeStep);
+        // std::cout<<"prepared model for timestep="<<timeStep<<std::endl;
+        StarGraph gs(node_id.size(), startNodes.size());
+        MaxFlow max_flow(&gs,source_id,sink_id);
+        for(int i=0;i<startNodes.size();i++){
+            ArcIndex arc=gs.AddArc(startNodes[i],endNodes[i]);
+            max_flow.SetArcCapacity(arc,1); //unit capacity
+        }
+        max_flow.Solve();
+        FlowQuantity total_flow = max_flow.GetOptimalFlow();
+        std::cout<<"the max flow quantity="<<total_flow<<"   num of robots="<<starts.size()<<std::endl;
+        if(total_flow==starts.size()) {     //solved
+            retrievePaths(max_flow,result);
+            resolveEdgeConflicts(result);
+            // std::cout<<"edge conflicts resolved!"<<std::endl;
+            return result;
+        }
+        timeStep++;
     }
-    return result;
+    return {};  //failed
+    
+    
 }
 
-
+/**
+ * @brief 
+ * 
+ * @param id 
+ * @param node 
+ */
 void FlowMAPF::insert_node(int &id,flowNode &node){
     if(node_id.find(node)==node_id.end()){
         node_id[node]=id;
         id_node[id]=node;
         id++;
     }
+}
+
+
+
+void FlowMAPF::add_edge(flowNode & u,flowNode &v){
+    startNodes.push_back(node_id[u]);
+    endNodes.push_back(node_id[v]);
 }
 
 /**
@@ -60,7 +98,11 @@ void FlowMAPF::insert_node(int &id,flowNode &node){
 void FlowMAPF::evaluateLB(){
     makespanLB=0;
     for(int i=0;i<starts.size();i++){
-        makespanLB=std::min(makespanLB,starts[i]->manhattan_dist(goals[i]));
+        int mki=9999996;
+        for(int j=0;j<starts.size();j++){
+            mki=std::min(mki,starts[i]->manhattan_dist(goals[j]));
+        }
+        makespanLB=std::max(mki,makespanLB);
     }
 }
 
@@ -72,70 +114,150 @@ void FlowMAPF::evaluateLB(){
  * @return true 
  * @return false 
  */
-void FlowMAPF::prepare(int timeStep,Path &result){
-    // id_node.cl
-    // startIndexes.clear();
-    // goalIndexes.clear();
+void FlowMAPF::prepare(int timeStep){
+    startNodes.clear();
+    endNodes.clear();
+    node_id.clear();
+    id_node.clear();
 
+
+    //out=0 in=1
     std::set<Location*> reachable_vertices;
     int id=0;
     for(int i=0;i<starts.size();i++) reachable_vertices.insert(starts[i]);
     for(int t=0;t<timeStep;t++){
         std::set<Location*> next_reachable_vertices;
-        for(auto &v1:reachable_vertices){
-            flowNode node1={v1->id,-1,t};
+        for(auto v1: reachable_vertices){
+            flowNode node1={v1->id,t,OUT};
             insert_node(id,node1);
-            for(auto &v2:reachable_vertices){
-               
-                std::pair<int,int> edge;
-                if(v1->id<v2->id) edge={v1->id,v2->id};
-                else edge={v2->id,v1->id};
-                flowNode node2,node3,node4;
-                node2={edge.first,edge.second,t+0.3};
+            auto nbrs=graph->getNeighbors(v1);
+            // std::cout<<"neighor size="<<nbrs.size()<<"  "<<v1->print()<<std::endl;
+            nbrs.push_back(v1);
+            for(auto v2: nbrs){
+                flowNode node2={v2->id,t+1,IN};
                 insert_node(id,node2);
-                node3={edge.first,edge.second,t+0.6};
-                insert_node(id,node3);
-                node4={v2->id,-1,t+0.9};
-                insert_node(id,node4);
                 add_edge(node1,node2);
-                add_edge(node2,node3);
-                add_edge(node3,node4);
                 next_reachable_vertices.insert(v2);
-                // add_edge(node_id[node1],node_id[node2]);
-                // add_edge(node_id[node])
             }
-            flowNode node5,node6;
-            node5=std::make_tuple(v1->id,-1,t+0.9);
-            node6=std::make_tuple(v1->id,-1,t+1);
-            insert_node(id,node5);
-            insert_node(id,node6);
-            add_edge(node1,node5);
-            add_edge(node5,node6);
+            next_reachable_vertices.insert(v1);
+            // flowNode node2={v1->id,t,IN}
+        }
+        for(auto &v:next_reachable_vertices){
+            flowNode node2={v->id,t+1,IN};
+            flowNode node3={v->id,t+1,OUT};
+            insert_node(id,node3);
+            add_edge(node2,node3);
         }
         reachable_vertices=next_reachable_vertices;
     }
-    flowNode source={-211,211,0};
-    flowNode sink={-985,-985,0};
+    
+    // add source and sink
+    flowNode source={-985,-985,OUT};
+    flowNode sink={-211,-211,IN};
     insert_node(id,source);
+    source_id=node_id[source];
     insert_node(id,sink);
+    sink_id=node_id[sink];
     for(int r=0;r<starts.size();r++){
-        flowNode snode={starts[r]->id,-1,0};
-        flowNode gnode={goals[r]->id,-1,timeStep};
-        add_edge(source,snode);
-        add_edge(gnode,sink);
+        flowNode sr={starts[r]->id,0,OUT};
+        flowNode gr={goals[r]->id,timeStep,OUT};
+        // assert(node_id.find(sr)!=node_id.end());
+        // assert(node_id.find(gr)!=node_id.end());
+        add_edge(source,sr);
+        add_edge(gr,sink);
     }
+}
 
+
+/**
+ * @brief 
+ * 
+ * @param max_flow 
+ * @param result 
+ */
+void FlowMAPF::retrievePaths(MaxFlow &max_flow,Paths &result){
+    std::map<int,int> adj_list;
+    auto starGraph=max_flow.graph();
+    for(int i=0;i<startNodes.size();i++){
+        if(fabs(max_flow.Flow(i)-1)<1e-2){
+            auto head_i=starGraph->Head(i);
+            auto tail_i=starGraph->Tail(i);
+            
+            auto head_node=id_node[head_i];
+            auto tail_node=id_node[tail_i];
+            // std::cout<<" head : ["<<graph->getVertex(head_node.first)->print()<<","<<head_node.second<<"] ";
+            // std::cout<<"tail: ["<<graph->getVertex(tail_node.first)->print()<<","<<tail_node.second<<"] ";
+            // std::cout<<"flow quatity: "<<max_flow.Flow(i)<<std::endl;
+            adj_list.insert({tail_i,head_i});
+        }
+    }
+    result=Paths(starts.size(),Path());
+    for(int i=0;i<starts.size();i++){
+        // std::cout<<"robot "<<i<<std::endl;
+        flowNode si={starts[i]->id,0,OUT};
+        flowNode sink={-211,-211,IN};
+        int current_id=node_id[si];
+        while(current_id!=node_id[sink]){
+            // int timestep=id_node[current_id].second;
+            auto flownode=id_node[current_id];
+            int vid=std::get<0>(flownode);
+            int in_or_out=std::get<2>(flownode);
+            if(in_or_out==OUT) result[i].push_back( graph->getVertex(vid));
+            // std::cout<<"current id="<< current_id<<"  timestep="<<timestep<<"  "<<graph->getVertex(id_node[current_id].first)->print()<<"   "<<current_id<<"  -->   "<<adj_list[current_id] <<std::endl;
+            current_id=adj_list[current_id];
+        }
+    }
+    // for(int i=0;i<starts.size();i++){
+    //     std::cout<<result[i].size()<<std::endl;
+    // }
+    
+    // for(int i=0;i<startNodes.size();i++){
+    //     goals[i]=result[i].back();
+    // }
 }
 
 
 
+/**
+ * @brief 
+ * find if there is any edge conflict and resolve them by switching tails
+ * @param result 
+ */
+void FlowMAPF::resolveEdgeConflicts(Paths &result){
+    for(int t=1;t<result[0].size();t++){
+        for(int i=0;i<result.size();i++){
+            for(int j=i+1;j<result.size();j++){
+                if(result[i][t]==result[j][t-1] and result[i][t-1]==result[j][t]){
+                    // std::cout<<"find edge conflict! resolving...."<<std::endl;
+                    switchPaths(i,j,t,result);
+                }
+            }
+        }
+    }
+
+    //update the goals
+    for(int i=0;i<starts.size();i++){
+        goals[i]=result[i].back();
+    }
+}
 
 
-
-
-
-
-
-
-
+/**
+ * @brief 
+ * 
+ * @param i 
+ * @param j 
+ * @param t 
+ * @param result 
+ */
+void FlowMAPF::switchPaths(int i,int j,int t,Paths &result){
+    Path pj=result[j];
+    assert(result[j].size()==result[i].size());
+    assert(result[0].size()==result[i].size());
+    // std::cout<<result[i].size()<<"    "<<result[j].size()<<std::endl;
+    for(int k=t;k<result[0].size();k++){
+        result[j][k]=result[i][k];
+        result[i][k]=pj[k];
+    }
+}
 

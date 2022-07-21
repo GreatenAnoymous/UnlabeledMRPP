@@ -27,6 +27,7 @@
 #include <boost/functional/hash.hpp>
 #include <stack>
 #include <limits>
+#include "json.hpp"
 
 typedef std::chrono::high_resolution_clock Time;
 typedef std::chrono::milliseconds ms;
@@ -61,7 +62,7 @@ public:
         return nodes.size();
     }
     std::vector<Location*> getNodes(){
-       return nodes; 
+        return nodes; 
     }
 
     void add_obstacles(Location *obs){
@@ -90,5 +91,6 @@ void format_paths(Paths &paths);
 void evaluate_result(Paths &,int &makespan,int &makespanLB,int &soc,int &socLB);   
 void fill_paths(Paths &,int makespan=-1);
 void shrink_paths(Paths&paths);
+void save_result_as_json(std::string file_name,Paths &paths,double runtime=0,bool save_paths=false);
 // void precompute_dist(Grids*graph,Configs&starts,Configs&goals,std::vector<std::tuple<int,int,double>>&costEdges);
 //////////////////////////////////////////////////////////////////////////////////
