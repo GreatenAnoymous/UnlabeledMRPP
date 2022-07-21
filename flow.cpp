@@ -166,7 +166,7 @@ void FlowMAPF::prepare(int timeStep){
         add_edge(source,sr);
         add_edge(gr,sink);
     }
-}
+}   
 
 
 /**
@@ -261,3 +261,101 @@ void FlowMAPF::switchPaths(int i,int j,int t,Paths &result){
     }
 }
 
+
+/**
+ * @brief 
+ * 
+ * @return Paths 
+ */
+Paths FlowMAPF::solveWeighted(){
+    auto getWeight=[&](int head,int tail){
+        auto node1=id_node[head];
+        auto node2=id_node[tail];
+        if(std::get<0>(node1)==std::get<1>(node2)) return 0;
+        return 1;
+    };
+    evaluateLB();
+    int timeStep=makespanLB;
+    bool solved=true;
+    Paths result;
+    while(true){
+        // std::cout<<"preparing model for timestep="<<timeStep<<std::endl;
+        prepare(timeStep);
+        // std::cout<<"prepared model for timestep="<<timeStep<<std::endl;
+        StarGraph gs(node_id.size(), startNodes.size());
+        MinCostFlow min_cost_flow(&gs);
+        std::vector<int> sink_arcs;
+        for(int i=0;i<startNodes.size();i++){
+            ArcIndex arc=gs.AddArc(startNodes[i],endNodes[i]);
+            min_cost_flow.SetArcCapacity(arc,1); //unit capacity
+            min_cost_flow.SetArcUnitCost(arc,getWeight(startNodes[i],endNodes[i]));
+            if(endNodes[i]==sink_id) sink_arcs.push_back(i);
+        }
+        int numRobots=starts.size();
+        min_cost_flow.SetNodeSupply(source_id,numRobots);
+        min_cost_flow.SetNodeSupply(sink_id,-numRobots);
+
+        min_cost_flow.Solve();
+        int total_flow=0;
+        for(auto arc_id:sink_arcs){
+            total_flow+=min_cost_flow.Flow(arc_id);
+        }
+        // FlowQuantity total_flow = max_flow.GetOptimalFlow();
+        std::cout<<"the max flow quantity="<<total_flow<<"   num of robots="<<starts.size()<<std::endl;
+        if(total_flow==numRobots) {     //solved
+            retrievePaths(min_cost_flow,result);
+            resolveEdgeConflicts(result);
+            // std::cout<<"edge conflicts resolved!"<<std::endl;
+            return result;
+        }
+        timeStep++;
+    }
+    return {};  //failed
+}
+
+/**
+ * @brief 
+ * 
+ * @param max_flow 
+ * @param result 
+ */
+void FlowMAPF::retrievePaths(MinCostFlow &max_flow,Paths &result){
+    std::map<int,int> adj_list;
+    auto starGraph=max_flow.graph();
+    for(int i=0;i<startNodes.size();i++){
+        if(fabs(max_flow.Flow(i)-1)<1e-2){
+            auto head_i=starGraph->Head(i);
+            auto tail_i=starGraph->Tail(i);
+            
+            auto head_node=id_node[head_i];
+            auto tail_node=id_node[tail_i];
+            // std::cout<<" head : ["<<graph->getVertex(head_node.first)->print()<<","<<head_node.second<<"] ";
+            // std::cout<<"tail: ["<<graph->getVertex(tail_node.first)->print()<<","<<tail_node.second<<"] ";
+            // std::cout<<"flow quatity: "<<max_flow.Flow(i)<<std::endl;
+            adj_list.insert({tail_i,head_i});
+        }
+    }
+    result=Paths(starts.size(),Path());
+    for(int i=0;i<starts.size();i++){
+        // std::cout<<"robot "<<i<<std::endl;
+        flowNode si={starts[i]->id,0,OUT};
+        flowNode sink={-211,-211,IN};
+        int current_id=node_id[si];
+        while(current_id!=node_id[sink]){
+            // int timestep=id_node[current_id].second;
+            auto flownode=id_node[current_id];
+            int vid=std::get<0>(flownode);
+            int in_or_out=std::get<2>(flownode);
+            if(in_or_out==OUT) result[i].push_back( graph->getVertex(vid));
+            // std::cout<<"current id="<< current_id<<"  timestep="<<timestep<<"  "<<graph->getVertex(id_node[current_id].first)->print()<<"   "<<current_id<<"  -->   "<<adj_list[current_id] <<std::endl;
+            current_id=adj_list[current_id];
+        }
+    }
+    // for(int i=0;i<starts.size();i++){
+    //     std::cout<<result[i].size()<<std::endl;
+    // }
+    
+    // for(int i=0;i<startNodes.size();i++){
+    //     goals[i]=result[i].back();
+    // }
+}

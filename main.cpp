@@ -26,10 +26,21 @@ void test1(){
     return;
 }
 
+void test2(){
+    Grids * graph=new Grids("./demo/30x30.map");
+    Configs starts,goals;
+    read_scen("./demo/30x30_agent100.scen",starts,goals,graph);
+    std::cout<<"scen file read!  num of robots="<<starts.size()<<std::endl;
+    FlowMAPF solver(starts,goals,graph);
+    Paths solution=solver.solveWeighted();
+    check_feasible_bruteForce(solution);
+    save_result_as_json("./demo30x30.json",solution,0,true);
+    return;
+}
 
 
 int main(){
-    test1();
+    test2();
     return 0;
 }
 
