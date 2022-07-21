@@ -4,9 +4,11 @@
  * @brief 
  * @version 0.1
  * @date 2022-07-19
- * Distance Optimal Unlabled MPP
+ * TODO:  Distance Optimal Unlabled MPP 
  * @copyright Copyright (c) 2022
  * 
+ * Reference: Yu, J., & LaValle, M. (2012, December). 
+ * Distance optimal formation control on graphs with a tight convergence time guarantee. In 2012 IEEE 51st IEEE Conference on Decision and Control (CDC) (pp. 4023-4028). IEEE.
  */
 
 #include"common.hpp"

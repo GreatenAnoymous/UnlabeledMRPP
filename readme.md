@@ -1,6 +1,6 @@
 # Unlabled multi-robot path planning on graphs
 1. max-flow based 
-2. distance optimal unlabled MRPP (odo)
+2. distance optimal unlabled MRPP (todo)
 
 ## Requirement
 1. [Ortools Library](https://developers.google.com/optimization)
